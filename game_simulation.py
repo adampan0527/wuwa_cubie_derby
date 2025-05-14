@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import random
+from prettytable import PrettyTable # Import PrettyTable
 from character import (CHARACTER_NAMES, JINHSI_SKILL_CHANCE, CHANGLI_SKILL_CHANCE, 
                        CAMELLYA_SKILL_CHANCE, CARLOTTA_SKILL_CHANCE, Character, 
                        find_character_by_id, update_stack_info_for_cell)
@@ -10,57 +11,63 @@ def roll_dice(character_name):
     return random.randint(1, 3)
 
 def game_simulation():
-    print("欢迎来到 Wuthering Waves 团子赛跑模拟器!\n")
+    print("Welcome to the Wuthering Waves Cubie Derby Simulator!\n")
 
-    # 获取重复模拟次数
+    # Get the number of simulations to run
     while True:
         try:
-            num_simulations_input = input("请输入重复模拟次数 (至少为1): ")
+            num_simulations_input = input("Enter the number of simulations to run (at least 1): ")
             num_simulations = int(num_simulations_input)
             if num_simulations <= 0:
-                print("重复模拟次数必须大于0，请重新输入。")
+                print("Number of simulations must be greater than 0. Please re-enter.")
                 continue
             break
         except ValueError:
-            print("输入无效，请输入一个整数。")
+            print("Invalid input. Please enter an integer.")
 
-    # --- 让我手动填写参与的角色 --- (User customization section)
-    # 请在此处输入参与角色的数字编号，用逗号分隔，例如: 1,2,3
-    # 可用角色编号及其对应名称:
+    # --- Select participating characters --- (User customization section)
+    print("\n--- Select Participating Characters ---")
+    print("Available characters and their IDs:")
+    for char_id, char_name in CHARACTER_NAMES.items():
+        print(f"{char_id}: {char_name}")
+    print("-----------------------------------")
+    # Enter the numerical IDs of the participating characters, separated by commas, e.g.: 1,2,3
+    # Available characters and their IDs:
     # 1: Jinhsi, 2: Changli, 3: Calcharo, 4: Shorekeeper, 5: Camellya, 6: Carlotta
     # 7: Roccia, 8: Brant, 9: Cantarella, 10: Zani, 11: Cartethya, 12: Phoebe
     # -----------------------------------
     while True:
         try:
-            player_input_ids_str = input("请输入参与角色的数字编号 (例如 1,2,5): ")
+            player_input_ids_str = input("Enter the numerical IDs of the participating characters (e.g., 1,2,5): ")
             participating_character_ids = [int(id_str.strip()) for id_str in player_input_ids_str.split(',')]
             if not participating_character_ids:
-                print("未选择任何角色，请至少选择一个角色。")
+                print("No characters selected. Please select at least one character.")
                 continue
             valid_ids = True
             for char_id in participating_character_ids:
                 if char_id not in CHARACTER_NAMES:
-                    print(f"错误：角色编号 {char_id} 无效。可用编号为: {list(CHARACTER_NAMES.keys())}")
+                    print(f"Error: Character ID {char_id} is invalid. Available IDs are: {list(CHARACTER_NAMES.keys())}")
                     valid_ids = False
                     break
             if valid_ids:
                 break
         except ValueError:
-            print("输入格式错误，请输入数字编号并用逗号分隔。")
+            print("Invalid input format. Please enter numerical IDs separated by commas.")
 
-    # 设置总里程
+    # Set total mileage
     total_mileage = 23
-    # max_rounds = 0 # 无回合限制 (Implicitly handled by game_ended logic)
-    print(f"游戏总里程设置为: {total_mileage} 步，无回合数限制。")
+    # max_rounds = 0 # No round limit (Implicitly handled by game_ended logic)
+    print(f"Total game mileage set to: {total_mileage} steps, with no round limit.")
 
     ranking_stats = {}
-    # 初始化排名统计字典
+    # Initialize ranking statistics dictionary
     for i in range(1, len(participating_character_ids) + 1):
         ranking_stats[i] = {name: 0 for id, name in CHARACTER_NAMES.items() if id in participating_character_ids}
 
     for sim_num in range(num_simulations):
         characters = [Character(id, CHARACTER_NAMES[id]) for id in participating_character_ids]
-        game_board = {0: participating_character_ids[:]}
+        game_board = {0: participating_character_ids[:] # Initialize all characters at position 0 on the game board
+        }
         for char in characters:
             char.position = 0 # Initialize all at position 0
         update_stack_info_for_cell(0, game_board, characters)
@@ -70,13 +77,13 @@ def game_simulation():
         turn_order = [] # Will be set at the start of each round
         changli_effect_pending_from_last_round = {} # Stores if Changli's skill triggered last round
 
-        # 主游戏循环
+        # Main game loop
         while not game_ended:
-            # 每个轮次开始时，随机重置角色的行动顺序，除非长离技能生效
+            # At the start of each round, randomize character turn order, unless Changli's skill is in effect
             if round_num == 1 or not changli_effect_pending_from_last_round:
                 turn_order = random.sample(characters, len(characters))
             else:
-                # Apply Changli's effect from previous round
+                # Apply Changli's effect from the previous round
                 temp_order_for_changli = []
                 changlis_to_move_last_for_changli = []
                 # Use the order from the end of the previous round as a base if available, or a fresh sample
@@ -103,7 +110,7 @@ def game_simulation():
                     if random.random() < CHANGLI_SKILL_CHANCE:
                         changli_effect_this_round[current_char.id] = True
 
-                # 里程胜利条件检查
+                # Mileage victory condition check
                 if total_mileage != 0 and current_char.position >= total_mileage:
                     game_ended = True
                     break # Exit inner for-loop (character turns)
@@ -114,7 +121,7 @@ def game_simulation():
             changli_effect_pending_from_last_round = changli_effect_this_round # Carry over to next round
             round_num += 1
 
-        # 单次模拟结束后的排名统计
+        # Ranking statistics after a single simulation ends
         def get_stack_order_in_cell(char_obj, game_board_state):
             # Ensure char_obj.position is a valid key and char_obj.id is in the list
             if char_obj.position in game_board_state and game_board_state[char_obj.position] and char_obj.id in game_board_state[char_obj.position]:
@@ -151,19 +158,31 @@ def game_simulation():
             # else: # This else implies the character was not in the initial setup for that rank, which is an issue
                  # ranking_stats[actual_rank][char_obj.name] = 1 # Should be pre-initialized to 0
 
-    # 所有模拟结束后的总结
-    print("\n--- 所有模拟完成 ---")
-    print("\n--- 最终排名统计 --- (名次: {角色: 次数})")
-    final_display_stats = {}
-    for rank, char_counts in ranking_stats.items():
-        filtered_counts = {char_name: count for char_name, count in char_counts.items() if count > 0}
-        if filtered_counts:
-            final_display_stats[rank] = filtered_counts
-    
-    for rank, char_counts in sorted(final_display_stats.items()):
-        print(f"第 {rank} 名: {char_counts}")
+    # Summary after all simulations are complete
+    print("\n--- All Simulations Complete ---")
+    print("\n--- Final Ranking Statistics ---")
 
-    print("\n感谢游玩!")
+    participating_character_names = [CHARACTER_NAMES[id] for id in participating_character_ids]
+
+    # Create table using PrettyTable
+    table = PrettyTable()
+    table.field_names = ["Rank"] + participating_character_names
+
+    # Table content
+    for rank_num in range(1, len(participating_character_ids) + 1):
+        row_data = [f"Rank {rank_num}"]
+        for char_name in participating_character_names:
+            count = 0
+            if rank_num in ranking_stats and char_name in ranking_stats[rank_num]:
+                count = ranking_stats[rank_num][char_name]
+            
+            probability = (count / num_simulations) * 100 if num_simulations > 0 else 0
+            row_data.append(f"{count} / {probability:.2f}%")
+        table.add_row(row_data)
+
+    print(table)
+
+    print("\nThanks for playing!")
 
 if __name__ == "__main__":
     game_simulation()
