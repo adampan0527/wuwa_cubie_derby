@@ -78,17 +78,11 @@ class Character:
 
         # Calcharo's skill: extra 3 steps if last
         if self.name == "Calcharo":
-            is_last = True
-            for char in all_characters:
-                if char.id != self.id and char.position < self.position:
-                    is_last = False
-                    break
-            if is_last:
-                # Check if truly last (no one else at a lower position)
-                min_pos = min(c.position for c in all_characters)
-                if self.position == min_pos:
-                    # print(f"Calcharo's skill triggers! Extra 3 steps.") # Removed print
-                    new_pos += 3
+            min_overall_position = min(c.position for c in all_characters)
+            # Calcharo is at the absolute last position and is at the bottom of his stack
+            if self.position == min_overall_position and self.stacked_below is None:
+                # print(f"Calcharo's skill triggers! Extra 3 steps.") # Removed print
+                new_pos += 3
 
         # Carlotta's skill: move twice
         if self.name == "Carlotta" and random.random() < CARLOTTA_SKILL_CHANCE:
@@ -147,25 +141,7 @@ class Character:
 
         game_board[target_pos].extend(chars_to_move_ids) # Add moving characters to the new cell
 
-        # Jinhsi's skill: move to top of stack
-        if self.name == "Jinhsi" and self.stacked_on_top and random.random() < JINHSI_SKILL_CHANCE:
-            # print(f"Jinhsi's skill triggers! Moves to the top of the current stack.") # Removed print
-            if target_pos in game_board and len(game_board[target_pos]) > 1:
-                # Remove Jinhsi from current position in stack
-                game_board[target_pos].remove(self.id)
-                # Add Jinhsi to the top
-                game_board[target_pos].append(self.id)
-
-                # Update Jinhsi's internal stack info
-                if len(game_board[target_pos]) > 1: # Check if there's still someone below
-                    new_char_below_jinhsi_id = game_board[target_pos][-2] # Second to last is now below Jinhsi
-                    new_char_below_jinhsi = find_char_func(new_char_below_jinhsi_id, all_characters)
-                    if new_char_below_jinhsi:
-                        new_char_below_jinhsi.stacked_on_top = [self.id] # Jinhsi is on top of them
-                        self.stacked_below = new_char_below_jinhsi_id
-                else: 
-                    self.stacked_below = None
-                self.stacked_on_top = []
+        # Jinhsi's skill is now handled at the end of the round in game_simulation.py
 
         # Re-evaluate stacking for the entire cell after all moves
         update_stack_func(target_pos, game_board, all_characters)

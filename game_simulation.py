@@ -105,11 +105,6 @@ def game_simulation():
                 steps = roll_dice(current_char.name)
                 current_char.move(steps, game_board, characters)
 
-                # Changli's skill check
-                if current_char.name == "Changli" and current_char.stacked_below:
-                    if random.random() < CHANGLI_SKILL_CHANCE:
-                        changli_effect_this_round[current_char.id] = True
-
                 # Mileage victory condition check
                 if total_mileage != 0 and current_char.position >= total_mileage:
                     game_ended = True
@@ -117,8 +112,28 @@ def game_simulation():
 
             if game_ended:
                 break # Exit while-loop (rounds)
+
+            # End of round skill checks
+            # Changli's skill: Affects next round's turn order
+            changli_effect_this_round_temp = {}
+            for char_obj in characters: # Iterate through all characters to check for Changli's skill
+                if char_obj.name == "Changli" and char_obj.stacked_below: # Changli's condition
+                    if random.random() < CHANGLI_SKILL_CHANCE:
+                        changli_effect_this_round_temp[char_obj.id] = True
+            changli_effect_pending_from_last_round = changli_effect_this_round_temp
+
+            # Jinhsi's skill: Move to top of stack
+            for char_obj in characters: # Iterate through all characters to check for Jinhsi's skill
+                if char_obj.name == "Jinhsi" and char_obj.stacked_on_top and random.random() < JINHSI_SKILL_CHANCE:
+                    # print(f"Jinhsi's skill triggers at end of round! Moves to the top of the current stack.") # Optional print
+                    current_cell_stack = game_board.get(char_obj.position, [])
+                    if char_obj.id in current_cell_stack and len(current_cell_stack) > 1:
+                        current_cell_stack.remove(char_obj.id)
+                        current_cell_stack.append(char_obj.id)
+                        game_board[char_obj.position] = current_cell_stack # Update game_board
+                        # Update Jinhsi's internal stack info and the character below her
+                        update_stack_info_for_cell(char_obj.position, game_board, characters)
             
-            changli_effect_pending_from_last_round = changli_effect_this_round # Carry over to next round
             round_num += 1
 
         # Ranking statistics after a single simulation ends
