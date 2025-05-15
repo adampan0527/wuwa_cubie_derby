@@ -54,23 +54,104 @@ def game_simulation():
         except ValueError:
             print("Invalid input format. Please enter numerical IDs separated by commas.")
 
+    # --- Set initial positions for participating characters ---
+    initial_positions = {}
+    print("\n--- Set Initial Positions (can be negative) ---")
+    for char_id in participating_character_ids:
+        char_name = CHARACTER_NAMES[char_id]
+        while True:
+            try:
+                pos_input = input(f"Enter initial position for {char_name} (ID: {char_id}): ")
+                initial_positions[char_id] = int(pos_input)
+                break
+            except ValueError:
+                print("Invalid input. Please enter an integer for the position.")
+
     # Set total mileage
-    total_mileage = 23
-    # max_rounds = 0 # No round limit (Implicitly handled by game_ended logic)
-    print(f"Total game mileage set to: {total_mileage} steps, with no round limit.")
+    original_total_mileage = 23
+    print(f"Original game mileage (before adjustments for negative starts): {original_total_mileage} steps.")
+
+    # Adjust positions and mileage if there are negative starting positions
+    min_initial_position = 0
+    if initial_positions:
+        min_initial_position = min(initial_positions.values())
+    
+    position_offset = 0
+    if min_initial_position < 0:
+        position_offset = abs(min_initial_position)
+        print(f"Negative start detected. Adjusting all positions and total mileage by {position_offset}.")
+
+    adjusted_total_mileage = original_total_mileage + position_offset
+    print(f"Adjusted total game mileage: {adjusted_total_mileage} steps, with no round limit.")
 
     ranking_stats = {}
     # Initialize ranking statistics dictionary
     for i in range(1, len(participating_character_ids) + 1):
         ranking_stats[i] = {name: 0 for id, name in CHARACTER_NAMES.items() if id in participating_character_ids}
 
+    # --- Pre-simulation: Determine initial character setup and stacking order ONCE --- 
+    initial_characters_by_pos = {}
+    for char_id in participating_character_ids:
+        adjusted_pos = initial_positions[char_id] + position_offset
+        if adjusted_pos not in initial_characters_by_pos:
+            initial_characters_by_pos[adjusted_pos] = []
+        initial_characters_by_pos[adjusted_pos].append(char_id)
+
+    # This dictionary will store the final, ordered list of character IDs for each starting position
+    final_initial_character_order_at_pos = {}
+
+    sorted_initial_positions_for_setup = sorted(initial_characters_by_pos.keys())
+
+    for pos_setup in sorted_initial_positions_for_setup:
+        char_ids_at_pos_setup = initial_characters_by_pos[pos_setup]
+        
+        if len(char_ids_at_pos_setup) > 1:
+            print(f"\n--- Specify Stack Order at Position {pos_setup - position_offset} (Adjusted: {pos_setup}) ---")
+            print(f"Characters at this position: {[CHARACTER_NAMES[cid] for cid in char_ids_at_pos_setup]}")
+            
+            ordered_char_ids_for_this_pos = []
+            temp_char_ids_for_prompt_setup = list(char_ids_at_pos_setup) # Mutable copy for prompt
+
+            for i in range(len(char_ids_at_pos_setup)):
+                while True:
+                    try:
+                        remaining_display = [f"{CHARACTER_NAMES[cid]} (ID: {cid})" for cid in temp_char_ids_for_prompt_setup]
+                        prompt_msg = f"Enter ID of character for stack level {i+1} (bottom is 1) from remaining: [{', '.join(remaining_display)}]: "
+                        chosen_id_str = input(prompt_msg)
+                        chosen_id = int(chosen_id_str.strip())
+                        if chosen_id in temp_char_ids_for_prompt_setup:
+                            ordered_char_ids_for_this_pos.append(chosen_id)
+                            temp_char_ids_for_prompt_setup.remove(chosen_id)
+                            break
+                        else:
+                            print("Invalid ID or ID already selected for this position. Please choose from the remaining list.")
+                    except ValueError:
+                        print("Invalid input. Please enter a numerical ID.")
+            final_initial_character_order_at_pos[pos_setup] = ordered_char_ids_for_this_pos
+        else:
+            # If only one character, no ordering needed, just store it
+            final_initial_character_order_at_pos[pos_setup] = char_ids_at_pos_setup
+
+    # --- Simulation Loop --- 
     for sim_num in range(num_simulations):
-        characters = [Character(id, CHARACTER_NAMES[id]) for id in participating_character_ids]
-        game_board = {0: participating_character_ids[:] # Initialize all characters at position 0 on the game board
-        }
-        for char in characters:
-            char.position = 0 # Initialize all at position 0
-        update_stack_info_for_cell(0, game_board, characters)
+        characters = []
+        game_board = {}
+
+        # Initialize characters and game_board based on the pre-determined initial order
+        for pos_init, ordered_ids_in_cell in final_initial_character_order_at_pos.items():
+            game_board[pos_init] = [] # Initialize cell in game_board
+            for char_id in ordered_ids_in_cell:
+                char = Character(char_id, CHARACTER_NAMES[char_id])
+                char.position = pos_init
+                characters.append(char)
+                game_board[pos_init].append(char.id)
+        
+        # Sort the main 'characters' list by ID for consistency if needed elsewhere (e.g. tie-breaking), though turn order is random
+        characters.sort(key=lambda c: c.id)
+
+        # Update stack info for all initial positions after ordering and character object creation
+        for pos_val_update in game_board.keys():
+            update_stack_info_for_cell(pos_val_update, game_board, characters)
 
         round_num = 1
         game_ended = False
@@ -106,7 +187,7 @@ def game_simulation():
                 current_char.move(steps, game_board, characters)
 
                 # Mileage victory condition check
-                if total_mileage != 0 and current_char.position >= total_mileage:
+                if adjusted_total_mileage != 0 and current_char.position >= adjusted_total_mileage:
                     game_ended = True
                     break # Exit inner for-loop (character turns)
 
