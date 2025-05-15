@@ -165,18 +165,22 @@ def game_simulation():
                 turn_order = random.sample(characters, len(characters))
             else:
                 # Apply Changli's effect from the previous round
-                temp_order_for_changli = []
-                changlis_to_move_last_for_changli = []
-                # Use the order from the end of the previous round as a base if available, or a fresh sample
-                # For simplicity, let's re-sample and then move Changli if the effect is pending
-                # This ensures randomness even if Changli's skill is active multiple times
-                current_round_base_order = random.sample(characters, len(characters))
-                for char_obj in current_round_base_order:
+                # First, establish a random turn order for everyone.
+                current_round_turn_order = random.sample(characters, len(characters))
+                
+                # Then, if Changli's skill is active for any Changli, move them to the end 
+                # without altering the relative order of other characters.
+                final_turn_order_this_round = []
+                changlis_to_move_to_end = []
+
+                for char_obj in current_round_turn_order:
                     if char_obj.id in changli_effect_pending_from_last_round:
-                        changlis_to_move_last_for_changli.append(char_obj)
+                        changlis_to_move_to_end.append(char_obj)
                     else:
-                        temp_order_for_changli.append(char_obj)
-                turn_order = temp_order_for_changli + changlis_to_move_last_for_changli
+                        final_turn_order_this_round.append(char_obj)
+                
+                # Add Changlis who triggered skill to the very end
+                turn_order = final_turn_order_this_round + changlis_to_move_to_end
             
             changli_effect_this_round = {} # Reset for current round's triggers
 
